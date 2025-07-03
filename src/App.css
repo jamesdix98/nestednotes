@@ -1,42 +1,191 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* Reset and base styles */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  background-color: #0f111a;
+  color: #ddd;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  user-select: none;
+  overflow: hidden; /* prevent scroll on body */
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Fixed narrow left navbar */
+.left-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 56px;
+  height: 100vh;
+  background-color: #353c49; /* Dark background */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 12px; /* Adds vertical spacing between buttons */
+  z-index: 100;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.collapse-button {
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+  padding: 8px;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.card {
-  padding: 2em;
+.collapse-button:hover {
+  background-color: #2d3748;
+  color: #fff;
 }
 
-.read-the-docs {
-  color: #888;
+.collapse-button:focus {
+  outline: 2px solid #4c9aff;
+  outline-offset: 2px;
 }
+
+.create-button {
+  background: transparent;
+  border-width: 1;
+  border-color: #cbd5e1;
+  color: #cbd5e1;
+  padding: 8px;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.open-button {
+  background: #cbd5e1;       /* Light background */
+  border: none;
+  color: #1a202c;            /* Dark text/icon for contrast */
+  padding: 8px;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.open-button:hover {
+  background-color: #a0aec0; /* Slightly darker gray on hover */
+  color: #1a202c;
+}
+
+.open-button:focus {
+  outline: 2px solid #4c9aff;
+  outline-offset: 2px;
+}
+
+/* Container for the split panels next to navbar */
+.split-container {
+  flex-grow: 1;
+  display: flex;
+  height: 100vh;
+  width: calc(100vw - 48px); /* subtract navbar width */
+}
+
+/* Split layout */
+.split {
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
+
+/* Panels styling */
+.panel {
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: auto;
+  height: 100%;
+}
+
+/* Left panel background */
+.left-panel {
+  background-color: #1a202c;
+  border-right: 1px solid #2d3748;
+  margin-left: 56px;
+}
+
+/* Right panel background */
+.right-panel {
+  background-color: #121622;
+}
+
+/* Gutter styling */
+.gutter {
+  background-color: #2d3748;
+  cursor: col-resize;
+  width: 10px;
+  height: 100%;
+  transition: background-color 0.3s ease;
+}
+
+.note-editor {
+  width: 100%;
+  height: 100%;
+  resize: none;
+  border: none;
+  padding: 16px;
+  font-size: 1rem;
+  font-family: sans-serif;
+  outline: none;
+  box-sizing: border-box;
+  background: transparent;
+  color: #cbd5e1;
+}
+
+.notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.note-item {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #2d3748;
+  color: white;
+  cursor: pointer;
+}
+
+.note-item.selected {
+  background: #4a5568;
+}
+
+
+/* Hide gutter when left panel collapsed */
+.gutter.gutter-horizontal {
+  /* The react-split gutter has gutter-horizontal class by default */
+}
+
+/* We'll hide the gutter using a little trick with react-split gutterClassName.
+   Because react-split doesn't have a built-in prop to hide gutter dynamically,
+   we can override the gutter visibility with JS. */
+
+/* We'll override gutter with display:none when left panel is collapsed via inline style in JSX */
+/* See note below */

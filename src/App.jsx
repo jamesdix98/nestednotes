@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Split from "react-split";
 import "./App.css";
 
@@ -8,7 +8,7 @@ import "./App.css";
  * tags, add to list when created, show them when selected from list, shorthand and tag metadata, add # function to text input
  * Fonts, title, images, tables etc in note section 
  * add new folders
- * work from local files 
+ * move, rename, delete etc notes
  * add title of folder to notes list 
  * option to select folder when creating a note (shift click? )
  * styling
@@ -21,27 +21,52 @@ export default function App() {
   const isCollapsed = leftSize === 0;
   const [activeSection, setActiveSection] = useState("notes");
   // State setup
-  const [folders, setFolders] = useState([
-    {
-      id: 1,
-      name: "Personal",
-      notes: [
-        { id: 1, title: "First Note", content: "This is the first note." },
-        { id: 2, title: "Second Note", content: "Second note content." },
-      ],
-    },
-    {
-      id: 2,
-      name: "Work",
-      notes: [
-        { id: 3, title: "Third Note", content: "Work note content." },
-      ],
-    },
-  ]);
+  const [folders, setFolders] = useState([]);
+  const [selectedFolderId, setSelectedFolderId] = useState(null);
+  const [selectedNote, setSelectedNote] = useState(null);
+  const selectedFolder = folders.find(f => f.id === selectedFolderId) || { notes: [] }
 
-  const [selectedFolderId, setSelectedFolderId] = useState(folders[0].id);
-  const selectedFolder = folders.find(f => f.id === selectedFolderId);
-  const [selectedNote, setSelectedNote] = useState(selectedFolder.notes[0]);
+  useEffect(() => {
+  const storedFolders = localStorage.getItem("folders");
+
+  if (storedFolders) {
+      const parsedFolders = JSON.parse(storedFolders);
+      setFolders(parsedFolders);
+
+      if (parsedFolders.length > 0) {
+        setSelectedFolderId(parsedFolders[0].id);
+        if (parsedFolders[0].notes.length > 0) {
+          setSelectedNote(parsedFolders[0].notes[0]);
+        }
+      }
+    } else {
+      // Create default "Get Started" folder and note
+      const defaultNote = {
+        id: crypto.randomUUID(),
+        title: "Get Started",
+        content:
+          "Welcome to your notes app!\n\n- Select or create a folder on the left.\n- Create a note and start writing.\n- Notes are saved automatically.\n\nEnjoy!",
+        tags: ["#gettingstarted"],
+      };
+
+      const defaultFolder = {
+        id: crypto.randomUUID(),
+        name: "Welcome",
+        notes: [defaultNote],
+      };
+
+      setFolders([defaultFolder]);
+      setSelectedFolderId(defaultFolder.id);
+      setSelectedNote(defaultNote);
+
+      localStorage.setItem("folders", JSON.stringify([defaultFolder]));
+    }
+  }, []);
+
+
+  useEffect(() => {
+    localStorage.setItem("folders", JSON.stringify(folders));
+  }, [folders]);
 
   // Add note to current folder
   const createNote = () => {
@@ -191,11 +216,25 @@ export default function App() {
             <textarea
               className="note-editor"
               style={{ marginLeft: isCollapsed ? 56 : 0 }}
-              value={selectedNote?.content}
-              onChange={(e) =>
-                setSelectedNote({ ...selectedNote, content: e.target.value })
-              }
+              value={selectedNote?.content || ""}
+              onChange={(e) => {
+                if (!selectedNote) return;
+                const updatedContent = e.target.value;
+                const updatedNote = { ...selectedNote, content: updatedContent };
+                setSelectedNote(updatedNote);
+
+                setFolders(folders.map(folder => {
+                  if (folder.id !== selectedFolderId) return folder;
+                  return {
+                    ...folder,
+                    notes: folder.notes.map(note =>
+                      note.id === updatedNote.id ? updatedNote : note
+                    ),
+                  };
+                }));
+              }}
             />
+
 
           </div>
         </Split>

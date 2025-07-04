@@ -13,6 +13,7 @@ import "./App.css";
  * option to select folder when creating a note (shift click? )
  * Nested folders 
  * Search function
+ * Selected folder, show in folders list, filter notes by folders, show as title? 
  * Protection against no data, create a new note. On delete, if no notes or folders, create empty
  * Icons from HeroIcons
  */
@@ -36,6 +37,13 @@ export default function App() {
 
   const [deleteConfirmNoteId, setDeleteConfirmNoteId] = useState(null);
   const deleteConfirmTimeoutRef = useRef(null);
+
+  const [editingFolderId, setEditingFolderId] = useState(null);
+  const [editingFolderName, setEditingFolderName] = useState('');
+
+  const [deleteConfirmFolderId, setDeleteConfirmFolderId] = useState(null);
+  const deleteConfirmFolderTimeoutRef = useRef(null);
+
 
   const inputRef = useRef(null);
 
@@ -195,6 +203,66 @@ export default function App() {
     setSelectedNote(newNote);
   };
 
+  const createFolder = () => {
+    const newFolder = {
+      id: crypto.randomUUID(),
+      name: "New Folder",
+      notes: [],
+    };
+    setFolders(prev => [...prev, newFolder]);
+    setSelectedFolderId(newFolder.id);
+    setSelectedNote(null);
+  };
+
+  const renameFolder = (folderId, newName) => {
+    if (!newName.trim()) return;
+    setFolders(prevFolders =>
+      prevFolders.map(folder =>
+        folder.id === folderId ? { ...folder, name: newName.trim() } : folder
+      )
+    );
+  };
+
+  function deleteFolderById(folderId) {
+    const updatedFolders = folders.filter(f => f.id !== folderId);
+    setFolders(updatedFolders);
+
+    if (selectedFolderId === folderId) {
+      const fallbackFolder = updatedFolders[0] || null;
+      setSelectedFolderId(fallbackFolder?.id || null);
+      setSelectedNote(fallbackFolder?.notes?.[0] || null);
+    }
+  }
+
+  function cancelDeleteFolderConfirm() {
+    setDeleteConfirmFolderId(null);
+    if (deleteConfirmFolderTimeoutRef.current) {
+      clearTimeout(deleteConfirmFolderTimeoutRef.current);
+      deleteConfirmFolderTimeoutRef.current = null;
+    }
+  }
+
+  function onDeleteFolderClick(folderId) {
+    if (deleteConfirmFolderId === folderId) {
+      deleteFolderById(folderId);
+      cancelDeleteFolderConfirm();
+    } else {
+      setDeleteConfirmFolderId(folderId);
+      deleteConfirmFolderTimeoutRef.current = setTimeout(() => {
+        cancelDeleteFolderConfirm();
+      }, 5000);
+    }
+  }
+
+  function handleFolderRename(folder, newName) {
+    if (folder && newName.trim()) {
+      const updatedFolders = folders.map(f =>
+        f.id === folder.id ? { ...f, name: newName.trim() } : f
+      );
+      setFolders(updatedFolders);
+    }
+  }
+
   // Handler to toggle collapse/expand
   const toggleLeftPanel = (state) => {
     if (state) {
@@ -314,20 +382,9 @@ export default function App() {
                           <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                         </svg>
                       ) : (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          strokeWidth={1.5}
-                          stroke="currentColor"
-                          className="size-5"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                          />
-                        </svg>
+                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                      </svg>
                       )}
                     </button>
                   </div>
@@ -341,21 +398,102 @@ export default function App() {
     // Render folders list
     if (activeSection === "folders") {
       return (
-        <div className="folders-list">
-          {folders.map((folder) => (
+        <div className="folder-list">
+        {folders.map((folder) => {
+          const isSelected = selectedFolderId === folder.id;
+          const isConfirmingDelete = deleteConfirmFolderId === folder.id;
+
+          return (
             <div
               key={folder.id}
-              className={`folder-item ${selectedFolderId === folder.id ? "selected" : ""}`}
-              onClick={() => {
-                setSelectedFolderId(folder.id);
-                const folderNotes = folders.find(f => f.id === folder.id)?.notes || [];
-                setSelectedNote(folderNotes[0] || null);
+              className={`folder-item ${isSelected ? "selected" : ""}`}
+              onClick={() => setSelectedFolderId(folder.id)}
+              onDoubleClick={() => {
+                setEditingFolderId(folder.id);
+                setEditingFolderName(folder.name);
               }}
             >
-              {folder.name}
+              {editingFolderId === folder.id ? (
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={editingFolderName}
+                  autoFocus
+                  onChange={(e) => setEditingFolderName(e.target.value)}
+                  onBlur={() => {
+                    handleFolderRename(folder, editingFolderName);
+                    setEditingFolderId(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleFolderRename(folder, editingFolderName);
+                      setEditingFolderId(null);
+                    } else if (e.key === "Escape") {
+                      setEditingFolderId(null);
+                    }
+                  }}
+                  className={`folder-title w-full truncate bg-transparent border-none outline-none ${
+                    isSelected ? "selected" : ""
+                  }`}
+                  style={{
+                    font: "inherit",
+                    backgroundColor: "transparent",
+                    margin: "0px",
+                    padding: "0px",
+                    width: "100%",
+                    border: "none",
+                    outline: "none",
+                    color: isSelected ? "#494e54" : "#cbd5e1",
+                  }}
+                />
+              ) : (
+                <span className={`${isSelected ? 'folder-title selected' : 'folder-title'}`}>{folder.name}</span>
+              )}
+
+              <div className="folder-buttons flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    setEditingFolderId(folder.id);
+                    setEditingFolderName(folder.name);
+                  }}
+                  className="rename-button p-1"
+                  aria-label="Rename Folder"
+                  title="Rename Folder"
+                >
+                  {/* Rename Icon */}
+                  <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 7.125L16.862 4.487" />
+                  </svg>
+                </button>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteFolderClick(folder.id);
+                  }}
+                  className={isConfirmingDelete ? "tick-button p-1" : "delete-button p-1"}
+                  aria-label={isConfirmingDelete ? "Confirm Delete Folder" : "Delete Folder"}
+                  title={isConfirmingDelete ? "Click to confirm delete" : "Delete Folder"}
+                >
+                  {isConfirmingDelete ? (
+                    // Tick Icon
+                    <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  ) : (
+                    // Trash Icon
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
+        <button onClick={createFolder}>+ New Folder</button>
+      </div>
       );
     }
 

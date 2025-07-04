@@ -75,6 +75,14 @@ html, body, #root {
   align-items: center;
 }
 
+.note-buttons {
+  display: flex;
+  align-items: end;
+  justify-content: end;
+  padding: 5px;
+  
+}
+
 .open-button {
   background: #cbd5e1;       /* Light background */
   border: none;
@@ -162,10 +170,76 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px;
+  padding: 1px;
+}
+
+.note-title {
+  padding: 5px;
+  margin: 5px;
+  color: #cbd5e1;
+}
+
+.note-title.hover {
+  color: #cbd5e1;
+}
+
+.note-title.selected {
+  color: #494e54;
 }
 
 .note-item {
+  flex-grow: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  border-bottom: 1px solid #494e54;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+  background-color: #2d3748;
+}
+
+.note-item.selected {
+  background-color: #cbd5e1;
+  border-bottom-color: #2b6cb0;
+  font-weight: bold;
+}
+
+.note-item .icon-button svg {
+  width: 20px;
+  height: 20px;
+  color: #a0aec0;
+}
+
+.note-item .icon-button:hover svg {
+  color: #f6ad55;
+}
+
+.note-icons {
+  display: flex;
+  gap: 8px;
+}
+
+.note-icons svg {
+  width: 20px;
+  height: 20px;
+  color: #a0aec0;
+  transition: color 0.2s;
+}
+
+.note-icons svg:hover {
+  color: #f6ad55;
+}
+
+.folder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.folder-item {
   padding: 8px 12px;
   border-radius: 8px;
   background: #2d3748;
@@ -173,19 +247,103 @@ html, body, #root {
   cursor: pointer;
 }
 
-.note-item.selected {
+.folder-item.selected {
   background: #4a5568;
 }
 
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #1a202c;
+  padding: 1.5rem;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.6);
+  color: #e2e8f0;
+}
+
+.modal-content input[type="text"] {
+  background: #2d3748;
+  border: 1px solid #4a5568;
+  color: #e2e8f0;
+  padding: 6px 10px;
+  border-radius: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.modal-content button {
+  margin-left: 8px;
+  padding: 6px 12px;
+  background: #4c51bf;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.modal-content button:hover {
+  background: #5a67d8;
+}
+
+.modal-content button:last-child {
+  background: #a0aec0;
+  color: #1a202c;
+}
+
+.modal-content button:last-child:hover {
+  background: #cbd5e1;
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 1.1rem;
+  color: #edf2f7;
+}
+
+.rename-button,
+.delete-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.2s ease;
+}
+
+.rename-button:hover svg {
+  color: #f6ad55; /* orange-400 */
+}
+
+.delete-button:hover svg {
+  color: #f87171; /* red-400 */
+}
+
+.rename-button svg,
+.delete-button svg {
+  color: #a0aec0; /* gray-400 */
+  width: 1.25rem;
+  height: 1.25rem;
+}
 
 /* Hide gutter when left panel collapsed */
 .gutter.gutter-horizontal {
   /* The react-split gutter has gutter-horizontal class by default */
 }
-
-/* We'll hide the gutter using a little trick with react-split gutterClassName.
-   Because react-split doesn't have a built-in prop to hide gutter dynamically,
-   we can override the gutter visibility with JS. */
-
-/* We'll override gutter with display:none when left panel is collapsed via inline style in JSX */
-/* See note below */

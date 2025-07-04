@@ -12,6 +12,10 @@ import "./App.css";
  * add title of folder to notes list 
  * option to select folder when creating a note (shift click? )
  * styling
+ * Nested folders 
+ * show notes in folders? 
+ * Can break if all notes are deleted
+ * Icons from HeroIcons
  */
 
 export default function App() {
@@ -25,8 +29,12 @@ export default function App() {
   const [selectedFolderId, setSelectedFolderId] = useState(null);
   const [selectedNote, setSelectedNote] = useState(null);
   const selectedFolder = folders.find(f => f.id === selectedFolderId) || { notes: [] }
+  const [modal, setModal] = useState({ type: null, note: null });
+  const [renameInput, setRenameInput] = useState('');
+  const [forceUpdate, setForceUpdate] = useState(0); // Trigger re-renders manually if needed
 
   useEffect(() => {
+    
   const storedFolders = localStorage.getItem("folders");
 
   if (storedFolders) {
@@ -62,6 +70,45 @@ export default function App() {
       localStorage.setItem("folders", JSON.stringify([defaultFolder]));
     }
   }, []);
+
+  const handleRename = () => {
+    if (modal.note && renameInput.trim()) {
+      const updatedNote = { ...modal.note, title: renameInput.trim() };
+      const updatedNotes = selectedFolder.notes.map((n) =>
+        n.id === modal.note.id ? updatedNote : n
+      );
+
+      setFolders((prevFolders) =>
+        prevFolders.map((folder) =>
+          folder.id === selectedFolderId
+            ? { ...folder, notes: updatedNotes }
+            : folder
+        )
+      );
+
+      setSelectedNote((prev) => (prev?.id === updatedNote.id ? updatedNote : prev));
+      setModal({ type: null, note: null });
+      setForceUpdate((prev) => prev + 1); // Trigger re-render
+    }
+  };
+
+  const handleDelete = () => {
+    const updatedNotes = selectedFolder.notes.filter((n) => n.id !== modal.note.id);
+    setFolders((prevFolders) =>
+      prevFolders.map((folder) =>
+        folder.id === selectedFolderId
+          ? { ...folder, notes: updatedNotes }
+          : folder
+      )
+    );
+
+    if (selectedNote?.id === modal.note.id) {
+      setSelectedNote(null);
+    }
+
+    setModal({ type: null, note: null });
+    setForceUpdate((prev) => prev + 1); // Trigger re-render
+  };
 
 
   useEffect(() => {
@@ -104,7 +151,54 @@ export default function App() {
     setActiveSection(section);
   };
 
+  const renameFolder = (id) => {
+    const newName = prompt("Enter new folder name:");
+    if (newName) {
+      setFolders((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, name: newName } : f))
+      );
+    }
+  };
+
+  const deleteFolder = (id) => {
+    if (window.confirm("Delete this folder and all its notes?")) {
+      setFolders((prev) => prev.filter((f) => f.id !== id));
+      setNotes((prev) => prev.filter((n) => n.folderId !== id));
+    }
+  };
+
+  const createNewFolder = () => {
+    const name = prompt("Folder name:");
+    if (name) {
+      setFolders((prev) => [...prev, { id: crypto.randomUUID(), name, notes: [] }]);
+    }
+  };
+
+  const renameNote = (id) => {
+    const newTitle = prompt("Enter new note title:");
+    if (newTitle) {
+      setNotes((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, title: newTitle } : n))
+      );
+    }
+  };
+
+  const deleteNote = (id) => {
+    if (window.confirm("Delete this note?")) {
+      setNotes((prev) => prev.filter((n) => n.id !== id));
+    }
+  };
+
+  const moveNoteToFolder = (noteId, newFolderId) => {
+    setNotes((prev) =>
+      prev.map((note) =>
+        note.id === noteId ? { ...note, folderId: newFolderId } : note
+      )
+    );
+  };
+
   const renderSections = () => {
+
     // Render folders list
     if (activeSection === "folders") {
       return (
@@ -115,7 +209,8 @@ export default function App() {
               className={`folder-item ${selectedFolderId === folder.id ? "selected" : ""}`}
               onClick={() => {
                 setSelectedFolderId(folder.id);
-                setSelectedNote(folders.find(f => f.id === folder.id).notes[0]);
+                const folderNotes = folders.find(f => f.id === folder.id)?.notes || [];
+                setSelectedNote(folderNotes[0] || null);
               }}
             >
               {folder.name}
@@ -125,25 +220,83 @@ export default function App() {
       );
     }
 
-    // Render notes list
     if (activeSection === "notes") {
       return (
-        <div className="notes-list">
-          {selectedFolder?.notes.map((note) => (
-            <div
-              key={note.id}
-              className={`note-item ${selectedNote?.id === note.id ? "selected" : ""}`}
-              onClick={() => setSelectedNote(note)}
-            >
-              {note.title}
-            </div>
-          ))}
+        <div className="notes-list" key={forceUpdate}>
+          {selectedFolder?.notes.map((note) => {
+            const isSelected = selectedNote?.id === note.id;
+            return (
+              <div
+                key={note.id}
+                className={`${isSelected ? "note-item selected" : "note-item"} cursor-pointer grow min-w-0 truncate ${
+                  isSelected ? "selected bg-accent text-accent-foreground" : ""
+                }`}
+                onClick={() => setSelectedNote(note)}
+              >
+                <div
+                  className={`${isSelected ? 'note-title selected' : 'note-title'}`}
+                >
+                  {note.title}
+                </div>
+
+                <div className="note-buttons flex items-center space-x-2 ">
+                  <button
+                    onClick={() => {
+                      setModal({ type: "rename", note });
+                      setRenameInput(note.title);
+                    }}
+                    className="rename-button p-1"
+                    aria-label="Rename"
+                    title="Rename"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                      className="size-5"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"
+                      />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={() => setModal({ type: "delete", note })}
+                    className="delete-button p-1"
+                    aria-label="Delete"
+                    title="Delete"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                      className="size-5"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       );
     }
 
     return null;
   };
+
 
   return (
     <div className="app-container">
@@ -234,10 +387,33 @@ export default function App() {
                 }));
               }}
             />
-
-
           </div>
         </Split>
+        
+        {modal.type && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              {modal.type === 'rename' && (
+                <>
+                  <h3>Rename Note</h3>
+                  <input
+                    value={renameInput}
+                    onChange={(e) => setRenameInput(e.target.value)}
+                  />
+                  <button onClick={handleRename}>Save</button>
+                </>
+              )}
+              {modal.type === 'delete' && (
+                <>
+                  <p>Are you sure you want to delete "{modal.note.title}"?</p>
+                  <button onClick={handleDelete}>Delete</button>
+                </>
+              )}
+              <button onClick={() => setModal({ type: null, note: null })}>Cancel</button>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

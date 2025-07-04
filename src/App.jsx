@@ -7,7 +7,7 @@ import "./App.css";
  * TODO
  * tags, add to list when created, show them when selected from list, shorthand and tag metadata, add # function to text input
  * Fonts, title, images, tables etc in note section 
- * add new folders
+ * make add new folders little plus button
  * add move notes 
  * add title of folder to notes list 
  * option to select folder when creating a note (shift click? )
@@ -399,6 +399,7 @@ export default function App() {
     if (activeSection === "folders") {
       return (
         <div className="folder-list">
+        <button onClick={createFolder}>+ New Folder</button>
         {folders.map((folder) => {
           const isSelected = selectedFolderId === folder.id;
           const isConfirmingDelete = deleteConfirmFolderId === folder.id;
@@ -492,7 +493,6 @@ export default function App() {
             </div>
           );
         })}
-        <button onClick={createFolder}>+ New Folder</button>
       </div>
       );
     }

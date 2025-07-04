@@ -243,6 +243,8 @@ html, body, #root {
   padding: 5px;
   margin: 5px;
   color: #cbd5e1;
+  display: block; /* or inline-block if needed */
+  padding: 0.25rem 0.5rem;
 }
 
 .folder-title.hover {

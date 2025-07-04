@@ -8,7 +8,8 @@ import "./App.css";
  * tags, add to list when created, show them when selected from list, shorthand and tag metadata, add # function to text input
  * Fonts, title, images, tables etc in note section 
  * add new folders
- * move, rename, delete etc notes
+ * add move notes 
+ * make delete prettier
  * add title of folder to notes list 
  * option to select folder when creating a note (shift click? )
  * styling
@@ -32,6 +33,16 @@ export default function App() {
   const [modal, setModal] = useState({ type: null, note: null });
   const [renameInput, setRenameInput] = useState('');
   const [forceUpdate, setForceUpdate] = useState(0); // Trigger re-renders manually if needed
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState("");
+
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (editingNoteId && inputRef.current) {
+      inputRef.current.select();
+    }
+  }, [editingNoteId]);
 
   useEffect(() => {
     
@@ -55,6 +66,7 @@ export default function App() {
         content:
           "Welcome to your notes app!\n\n- Select or create a folder on the left.\n- Create a note and start writing.\n- Notes are saved automatically.\n\nEnjoy!",
         tags: ["#gettingstarted"],
+        lastEdited: Date.now(),
       };
 
       const defaultFolder = {
@@ -71,11 +83,11 @@ export default function App() {
     }
   }, []);
 
-  const handleRename = () => {
-    if (modal.note && renameInput.trim()) {
-      const updatedNote = { ...modal.note, title: renameInput.trim() };
+  const handleRename = (note, newTitle) => {
+    if (note && newTitle.trim()) {
+      const updatedNote = { ...note, title: newTitle.trim(), lastEdited: Date.now() };
       const updatedNotes = selectedFolder.notes.map((n) =>
-        n.id === modal.note.id ? updatedNote : n
+        n.id === note.id ? updatedNote : n
       );
 
       setFolders((prevFolders) =>
@@ -87,8 +99,7 @@ export default function App() {
       );
 
       setSelectedNote((prev) => (prev?.id === updatedNote.id ? updatedNote : prev));
-      setModal({ type: null, note: null });
-      setForceUpdate((prev) => prev + 1); // Trigger re-render
+      setForceUpdate((prev) => prev + 1);
     }
   };
 
@@ -117,11 +128,14 @@ export default function App() {
 
   // Add note to current folder
   const createNote = () => {
+    const timestamp = Date.now();
     const newNote = {
-      id: Date.now(),
+      id: timestamp,
       title: "New Note",
       content: "",
+      lastEdited: timestamp,
     };
+
     setFolders(folders.map(folder => {
       if (folder.id === selectedFolderId) {
         return {
@@ -223,7 +237,9 @@ export default function App() {
     if (activeSection === "notes") {
       return (
         <div className="notes-list" key={forceUpdate}>
-          {selectedFolder?.notes.map((note) => {
+          {[...selectedFolder?.notes]
+            .sort((a, b) => (b.lastEdited || 0) - (a.lastEdited || 0))
+            .map((note) => {
             const isSelected = selectedNote?.id === note.id;
             return (
               <div
@@ -231,19 +247,57 @@ export default function App() {
                 className={`${isSelected ? "note-item selected" : "note-item"} cursor-pointer grow min-w-0 truncate ${
                   isSelected ? "selected bg-accent text-accent-foreground" : ""
                 }`}
+                onDoubleClick={() => {
+                  setEditingNoteId(note.id);
+                  setEditingTitle(note.title);
+                }}
                 onClick={() => setSelectedNote(note)}
               >
-                <div
-                  className={`${isSelected ? 'note-title selected' : 'note-title'}`}
-                >
-                  {note.title}
+                <div className={`${isSelected ? 'note-title selected' : 'note-title'}`}>
+                  {editingNoteId === note.id ? (
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={editingTitle}
+                      autoFocus
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onBlur={() => {
+                        handleRename(note, editingTitle);
+                        setEditingNoteId(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleRename(note, editingTitle);
+                          setEditingNoteId(null);
+                        } else if (e.key === "Escape") {
+                          setEditingNoteId(null);
+                        }
+                      }}
+                      className={`note-title w-full truncate bg-transparent border-none outline-none ${
+                        isSelected ? "selected" : ""
+                      }`}
+                      style={{
+                        font: "inherit",
+                        backgroundColor: "transparent",
+                        margin: "0px",
+                        padding: "0px",
+                        width: "100%",
+                        border: "none",
+                        outline: "none",
+                        color: isSelected ? "#494e54" : "#cbd5e1",
+                      }}
+                    />
+                  ) : (
+                    note.title
+                  )}
+
                 </div>
 
                 <div className="note-buttons flex items-center space-x-2 ">
                   <button
                     onClick={() => {
-                      setModal({ type: "rename", note });
-                      setRenameInput(note.title);
+                      setEditingNoteId(note.id);
+                      setEditingTitle(note.title);
                     }}
                     className="rename-button p-1"
                     aria-label="Rename"
@@ -372,19 +426,30 @@ export default function App() {
               value={selectedNote?.content || ""}
               onChange={(e) => {
                 if (!selectedNote) return;
-                const updatedContent = e.target.value;
-                const updatedNote = { ...selectedNote, content: updatedContent };
-                setSelectedNote(updatedNote);
 
-                setFolders(folders.map(folder => {
+                const updatedContent = e.target.value;
+                const updatedNote = {
+                  ...selectedNote,
+                  content: updatedContent,
+                  timeUpdated: Date.now(),
+                  lastEdited: Date.now(),
+                };
+
+                setFolders(prevFolders => prevFolders.map(folder => {
                   if (folder.id !== selectedFolderId) return folder;
+
+                  const updatedNotes = folder.notes
+                    .map(note => note.id === updatedNote.id ? updatedNote : note)
+                    .sort((a, b) => b.timeUpdated - a.timeUpdated);
+
                   return {
                     ...folder,
-                    notes: folder.notes.map(note =>
-                      note.id === updatedNote.id ? updatedNote : note
-                    ),
+                    notes: updatedNotes,
                   };
                 }));
+
+                setSelectedNote(updatedNote);              
+                setForceUpdate(prev => prev + 1);
               }}
             />
           </div>

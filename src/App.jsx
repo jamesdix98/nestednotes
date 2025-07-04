@@ -9,13 +9,11 @@ import "./App.css";
  * Fonts, title, images, tables etc in note section 
  * add new folders
  * add move notes 
- * make delete prettier
  * add title of folder to notes list 
  * option to select folder when creating a note (shift click? )
- * styling
  * Nested folders 
- * show notes in folders? 
- * Can break if all notes are deleted
+ * Search function
+ * Protection against no data, create a new note. On delete, if no notes or folders, create empty
  * Icons from HeroIcons
  */
 
@@ -36,7 +34,75 @@ export default function App() {
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingTitle, setEditingTitle] = useState("");
 
+  const [deleteConfirmNoteId, setDeleteConfirmNoteId] = useState(null);
+  const deleteConfirmTimeoutRef = useRef(null);
+
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (!deleteConfirmNoteId) return;
+
+    function handleClickOutside(e) {
+      // If click is outside delete confirm icon, cancel
+      if (!e.target.closest(".delete-button") && !e.target.closest(".tick-button")) {
+        cancelDeleteConfirm();
+      }
+    }
+    function handleEscape(e) {
+      if (e.key === "Escape") {
+        cancelDeleteConfirm();
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [deleteConfirmNoteId]);
+
+  // Cancel delete confirmation
+  function cancelDeleteConfirm() {
+    setDeleteConfirmNoteId(null);
+    if (deleteConfirmTimeoutRef.current) {
+      clearTimeout(deleteConfirmTimeoutRef.current);
+      deleteConfirmTimeoutRef.current = null;
+    }
+  }
+
+  // When user first clicks delete icon
+  function onDeleteClick(noteId) {
+    if (deleteConfirmNoteId === noteId) {
+      // Second click on tick: confirm delete
+      deleteNoteById(noteId);
+      cancelDeleteConfirm();
+    } else {
+      // First click: show tick
+      setDeleteConfirmNoteId(noteId);
+      // Set 5 second timeout to cancel
+      deleteConfirmTimeoutRef.current = setTimeout(() => {
+        cancelDeleteConfirm();
+      }, 5000);
+    }
+  }
+
+  // Actual delete function by note id
+  function deleteNoteById(noteId) {
+    const updatedNotes = selectedFolder.notes.filter(n => n.id !== noteId);
+    setFolders(prevFolders =>
+      prevFolders.map(folder =>
+        folder.id === selectedFolderId
+          ? { ...folder, notes: updatedNotes }
+          : folder
+      )
+    );
+    if (selectedNote?.id === noteId) {
+      setSelectedNote(null);
+    }
+    setForceUpdate(prev => prev + 1);
+  }
 
   useEffect(() => {
     if (editingNoteId && inputRef.current) {
@@ -103,25 +169,6 @@ export default function App() {
     }
   };
 
-  const handleDelete = () => {
-    const updatedNotes = selectedFolder.notes.filter((n) => n.id !== modal.note.id);
-    setFolders((prevFolders) =>
-      prevFolders.map((folder) =>
-        folder.id === selectedFolderId
-          ? { ...folder, notes: updatedNotes }
-          : folder
-      )
-    );
-
-    if (selectedNote?.id === modal.note.id) {
-      setSelectedNote(null);
-    }
-
-    setModal({ type: null, note: null });
-    setForceUpdate((prev) => prev + 1); // Trigger re-render
-  };
-
-
   useEffect(() => {
     localStorage.setItem("folders", JSON.stringify(folders));
   }, [folders]);
@@ -165,53 +212,131 @@ export default function App() {
     setActiveSection(section);
   };
 
-  const renameFolder = (id) => {
-    const newName = prompt("Enter new folder name:");
-    if (newName) {
-      setFolders((prev) =>
-        prev.map((f) => (f.id === id ? { ...f, name: newName } : f))
-      );
-    }
-  };
-
-  const deleteFolder = (id) => {
-    if (window.confirm("Delete this folder and all its notes?")) {
-      setFolders((prev) => prev.filter((f) => f.id !== id));
-      setNotes((prev) => prev.filter((n) => n.folderId !== id));
-    }
-  };
-
-  const createNewFolder = () => {
-    const name = prompt("Folder name:");
-    if (name) {
-      setFolders((prev) => [...prev, { id: crypto.randomUUID(), name, notes: [] }]);
-    }
-  };
-
-  const renameNote = (id) => {
-    const newTitle = prompt("Enter new note title:");
-    if (newTitle) {
-      setNotes((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, title: newTitle } : n))
-      );
-    }
-  };
-
-  const deleteNote = (id) => {
-    if (window.confirm("Delete this note?")) {
-      setNotes((prev) => prev.filter((n) => n.id !== id));
-    }
-  };
-
-  const moveNoteToFolder = (noteId, newFolderId) => {
-    setNotes((prev) =>
-      prev.map((note) =>
-        note.id === noteId ? { ...note, folderId: newFolderId } : note
-      )
-    );
-  };
-
   const renderSections = () => {
+    if (activeSection === "notes") {
+      return (
+        <div className="notes-list" key={forceUpdate}>
+          {[...selectedFolder?.notes]
+            .sort((a, b) => (b.lastEdited || 0) - (a.lastEdited || 0))
+            .map((note) => {
+              const isSelected = selectedNote?.id === note.id;
+              const isConfirmingDelete = deleteConfirmNoteId === note.id;
+
+              return (
+                <div
+                  key={note.id}
+                  className={`${isSelected ? "note-item selected" : "note-item"} cursor-pointer grow min-w-0 truncate ${
+                    isSelected ? "selected bg-accent text-accent-foreground" : ""
+                  }`}
+                  onDoubleClick={() => {
+                    setEditingNoteId(note.id);
+                    setEditingTitle(note.title);
+                  }}
+                  onClick={() => setSelectedNote(note)}
+                >
+                  <div className={`${isSelected ? "note-title selected" : "note-title"}`}>
+                    {editingNoteId === note.id ? (
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={editingTitle}
+                        autoFocus
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onBlur={() => {
+                          handleRename(note, editingTitle);
+                          setEditingNoteId(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handleRename(note, editingTitle);
+                            setEditingNoteId(null);
+                          } else if (e.key === "Escape") {
+                            setEditingNoteId(null);
+                          }
+                        }}
+                        className={`note-title w-full truncate bg-transparent border-none outline-none ${
+                          isSelected ? "selected" : ""
+                        }`}
+                        style={{
+                          font: "inherit",
+                          backgroundColor: "transparent",
+                          margin: "0px",
+                          padding: "0px",
+                          width: "100%",
+                          border: "none",
+                          outline: "none",
+                          color: isSelected ? "#494e54" : "#cbd5e1",
+                        }}
+                      />
+                    ) : (
+                      note.title
+                    )}
+                  </div>
+
+                  <div className="note-buttons flex items-center space-x-2 ">
+                    <button
+                      onClick={() => {
+                        setEditingNoteId(note.id);
+                        setEditingTitle(note.title);
+                      }}
+                      className="rename-button p-1"
+                      aria-label="Rename"
+                      title="Rename"
+                    >
+                      {/* Rename icon SVG (same as before) */}
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                        stroke="currentColor"
+                        className="size-5"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"
+                        />
+                      </svg>
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation(); // prevent note selection on click
+                        onDeleteClick(note.id);
+                      }}
+                      className={isConfirmingDelete ? "tick-button p-1" : "delete-button p-1"}
+                      aria-label={isConfirmingDelete ? "Confirm Delete" : "Delete"}
+                      title={isConfirmingDelete ? "Click to confirm delete" : "Delete"}
+                    >
+                      {isConfirmingDelete ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      ) : (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth={1.5}
+                          stroke="currentColor"
+                          className="size-5"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      );
+    }
 
     // Render folders list
     if (activeSection === "folders") {
@@ -230,120 +355,6 @@ export default function App() {
               {folder.name}
             </div>
           ))}
-        </div>
-      );
-    }
-
-    if (activeSection === "notes") {
-      return (
-        <div className="notes-list" key={forceUpdate}>
-          {[...selectedFolder?.notes]
-            .sort((a, b) => (b.lastEdited || 0) - (a.lastEdited || 0))
-            .map((note) => {
-            const isSelected = selectedNote?.id === note.id;
-            return (
-              <div
-                key={note.id}
-                className={`${isSelected ? "note-item selected" : "note-item"} cursor-pointer grow min-w-0 truncate ${
-                  isSelected ? "selected bg-accent text-accent-foreground" : ""
-                }`}
-                onDoubleClick={() => {
-                  setEditingNoteId(note.id);
-                  setEditingTitle(note.title);
-                }}
-                onClick={() => setSelectedNote(note)}
-              >
-                <div className={`${isSelected ? 'note-title selected' : 'note-title'}`}>
-                  {editingNoteId === note.id ? (
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      value={editingTitle}
-                      autoFocus
-                      onChange={(e) => setEditingTitle(e.target.value)}
-                      onBlur={() => {
-                        handleRename(note, editingTitle);
-                        setEditingNoteId(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleRename(note, editingTitle);
-                          setEditingNoteId(null);
-                        } else if (e.key === "Escape") {
-                          setEditingNoteId(null);
-                        }
-                      }}
-                      className={`note-title w-full truncate bg-transparent border-none outline-none ${
-                        isSelected ? "selected" : ""
-                      }`}
-                      style={{
-                        font: "inherit",
-                        backgroundColor: "transparent",
-                        margin: "0px",
-                        padding: "0px",
-                        width: "100%",
-                        border: "none",
-                        outline: "none",
-                        color: isSelected ? "#494e54" : "#cbd5e1",
-                      }}
-                    />
-                  ) : (
-                    note.title
-                  )}
-
-                </div>
-
-                <div className="note-buttons flex items-center space-x-2 ">
-                  <button
-                    onClick={() => {
-                      setEditingNoteId(note.id);
-                      setEditingTitle(note.title);
-                    }}
-                    className="rename-button p-1"
-                    aria-label="Rename"
-                    title="Rename"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={1.5}
-                      stroke="currentColor"
-                      className="size-5"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"
-                      />
-                    </svg>
-                  </button>
-
-                  <button
-                    onClick={() => setModal({ type: "delete", note })}
-                    className="delete-button p-1"
-                    aria-label="Delete"
-                    title="Delete"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={1.5}
-                      stroke="currentColor"
-                      className="size-5"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
         </div>
       );
     }
@@ -454,31 +465,6 @@ export default function App() {
             />
           </div>
         </Split>
-        
-        {modal.type && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              {modal.type === 'rename' && (
-                <>
-                  <h3>Rename Note</h3>
-                  <input
-                    value={renameInput}
-                    onChange={(e) => setRenameInput(e.target.value)}
-                  />
-                  <button onClick={handleRename}>Save</button>
-                </>
-              )}
-              {modal.type === 'delete' && (
-                <>
-                  <p>Are you sure you want to delete "{modal.note.title}"?</p>
-                  <button onClick={handleDelete}>Delete</button>
-                </>
-              )}
-              <button onClick={() => setModal({ type: null, note: null })}>Cancel</button>
-            </div>
-          </div>
-        )}
-
       </div>
     </div>
   );

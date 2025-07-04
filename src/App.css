@@ -315,6 +315,7 @@ html, body, #root {
   color: #edf2f7;
 }
 
+.tick-button,
 .rename-button,
 .delete-button {
   display: inline-flex;
@@ -336,7 +337,12 @@ html, body, #root {
   color: #f87171; /* red-400 */
 }
 
+.tick-button:hover svg {
+  color: #f87171; /* red-400 */
+}
+
 .rename-button svg,
+.tick-button svg,
 .delete-button svg {
   color: #a0aec0; /* gray-400 */
   width: 1.25rem;
